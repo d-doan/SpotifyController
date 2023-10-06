@@ -1,5 +1,7 @@
 import serial
 import spotipy
+import time
+import atexit
 from spotipy.oauth2 import SpotifyOAuth
 from decouple import config
 
@@ -14,20 +16,40 @@ sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id=CLIENT_ID,
                                                scope="user-modify-playback-state user-read-playback-state"))
 
 # establish connection to arduino
-ser = serial.Serial("COM3", BAUD_RATE)
+ser = serial.Serial("COM    3", BAUD_RATE)
+
+last_track_name = ""
+
+# def close_serial():
+#     ser.close()
+#     print("Serial connection closed!")
+
+# atexit.register(close_serial)
 
 while True:
+
+    current_playback = sp.current_playback()
+
+    if current_playback:
+        track_name = current_playback['item']['name']
+
+        if track_name != last_track_name:
+            ser.write(track_name.encode())
+            last_track_name = track_name
+
     if ser.inWaiting():
         command = ser.readline().decode("utf-8").strip()
 
-        if command == "PLAY_PAUSE":
-            current_playback = sp.current_playback()
+        if command == "PLAY_PAUSE" and current_playback:
+            # current_playback = sp.current_playback()
             if current_playback['is_playing']:
                 sp.pause_playback()
             else:
                 sp.start_playback()
         elif command == "NEXT_TRACK":
             sp.next_track()
+
+    time.sleep(1)
 
 # implement
 # setup spotify api call to get song name
@@ -39,3 +61,5 @@ while True:
 # also add ability to add song into liked playlist
 # shuffle between list of predetermined playlists?
 # use joystick to go seek in song
+
+# TODO add close port upon script close
