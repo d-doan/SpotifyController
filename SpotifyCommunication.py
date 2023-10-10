@@ -12,9 +12,13 @@ BAUD_RATE = 9600
 
 # establish connection to arduino
 ser = serial.Serial("COM3", BAUD_RATE)
+HEARTBEAT_INTERVAL = 3
+
+log_file = open("arduino_log.txt", "a")
 
 def close_serial():
     ser.close()
+    log_file.close()
     print("Serial connection closed!")
 
 atexit.register(close_serial)
@@ -36,13 +40,20 @@ while True:
         # need to combine all artists together into string
         artist_name = ', '.join([artist['name'] for artist in current_playback['item']['artists']])
 
-        combined_track_artist = track_name + "|" + artist_name
+        combined_track_artist = track_name + "|" + artist_name + "\n"
         if track_name != last_track_name:
+            print("old track: " + last_track_name)
+            print("new track: " + track_name)
+            # send heartbeat when new song appears
+            ser.write("HEARTBEAT\n".encode())
             ser.write(combined_track_artist.encode())
             last_track_name = track_name
 
     if ser.inWaiting():
         command = ser.readline().decode("utf-8").strip()
+
+        log_file.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} - Received: {command}\n")
+        log_file.flush() # This ensures that data is written immediately and not buffered
 
         if command == "PLAY_PAUSE":
             if current_playback and current_playback['is_playing']:
@@ -52,14 +63,9 @@ while True:
         elif command == "NEXT_TRACK":
             sp.next_track()
 
-    time.sleep(1)
 
-# implement
-# setup spotify api call to get song name
-# possibly rename file
-# work with display
-# maybe integrate spotify api for specific functionality
-# need song info for display too
+    time.sleep(HEARTBEAT_INTERVAL)
+
+# add title scrolling if too long
 # also add ability to add song into liked playlist
 # shuffle between list of predetermined playlists?
-# use joystick to go seek in song
