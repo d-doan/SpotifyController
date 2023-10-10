@@ -12,7 +12,7 @@ BAUD_RATE = 9600
 
 # establish connection to arduino
 ser = serial.Serial("COM3", BAUD_RATE)
-HEARTBEAT_INTERVAL = 3
+HEARTBEAT_INTERVAL = 1
 
 log_file = open("arduino_log.txt", "a")
 
@@ -21,8 +21,10 @@ def close_serial():
     log_file.close()
     print("Serial connection closed!")
 
+# close serial port when program finishes
 atexit.register(close_serial)
 
+# authenticate spotify api
 sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id=CLIENT_ID,
                                                client_secret=CLIENT_SECRET,
                                                redirect_uri=REDIRECT_URI,
@@ -31,7 +33,6 @@ sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id=CLIENT_ID,
 last_track_name = ""
 
 while True:
-
     current_playback = sp.current_playback()
 
     if current_playback and current_playback['item']:
@@ -42,9 +43,8 @@ while True:
 
         combined_track_artist = track_name + "|" + artist_name + "\n"
         if track_name != last_track_name:
-            print("old track: " + last_track_name)
-            print("new track: " + track_name)
             # send heartbeat when new song appears
+            # need to do this before new song so display does not immediately clear when heartbeat invalid
             ser.write("HEARTBEAT\n".encode())
             ser.write(combined_track_artist.encode())
             last_track_name = track_name
@@ -53,7 +53,7 @@ while True:
         command = ser.readline().decode("utf-8").strip()
 
         log_file.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} - Received: {command}\n")
-        log_file.flush() # This ensures that data is written immediately and not buffered
+        log_file.flush()
 
         if command == "PLAY_PAUSE":
             if current_playback and current_playback['is_playing']:
@@ -62,7 +62,6 @@ while True:
                 sp.start_playback()
         elif command == "NEXT_TRACK":
             sp.next_track()
-
 
     time.sleep(HEARTBEAT_INTERVAL)
 
